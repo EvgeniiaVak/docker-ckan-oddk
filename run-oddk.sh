@@ -1,0 +1,1 @@
+docker-compose -p oddk-ckan -f docker-compose.oddk.yml up --build

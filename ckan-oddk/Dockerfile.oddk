@@ -1,0 +1,63 @@
+FROM openknowledge/ckan-base:2.8
+#FROM viderum/ckan:2.7.5-uwsgi-varnish-harvest-celery-archiver
+MAINTAINER Datopian
+
+ENV APP_DIR=/srv/app
+ENV SRC_EXTENSIONS_DIR=/srv/app/src_extensions
+
+#RUN pip install --upgrade pip && pip install  --no-cache-dir -e git+https://github.com/datopian/ckanext-s3filestore.git@fix-null-content-type#egg=ckanext-s3filestore && \
+#    pip install --no-cache-dir -r https://raw.githubusercontent.com/datopian/ckanext-s3filestore/fix-null-content-type/requirements.txt && \
+#    pip install --no-cache-dir -e git+https://github.com/okfn/ckanext-sentry.git#egg=ckanext-sentry && \
+#    pip install --no-cache-dir -e git+https://github.com/ckan/ckanext-geoview.git@v0.0.13#egg=ckanext-geoview && \
+#    pip install --no-cache-dir -e git+https://github.com/ckan/ckanext-pdfview.git@0.0.5#egg=ckanext-pdfview && \
+#    pip install --no-cache-dir -e git+https://github.com/ViderumGlobal/ckanext-portalopendatadk.git@v0.0.3#egg=ckanext-portalopendatadk && \
+#    pip install --no-cache-dir -e git+https://github.com/ViderumGlobal/ckanext-cprvalidation.git@v0.0.1a#egg=ckanext-cprvalidation && \
+#    pip install --no-cache-dir -r https://raw.githubusercontent.com/ViderumGlobal/ckanext-cprvalidation/v0.0.1a/requirements.txt && \
+#    pip install --no-cache-dir -e git+https://github.com/ViderumGlobal/ckanext-updatetracking.git@9b231d5e67cb76551408b978ab752dba4953455c#egg=ckanext-updatetracking && \
+#    pip install --no-cache-dir -r https://raw.githubusercontent.com/ViderumGlobal/ckanext-updatetracking/9b231d5e67cb76551408b978ab752dba4953455c/requirements.txt && \
+#    pip install --no-cache-dir -e git+https://github.com/datopian/ckanext-noanonaccess.git@v1.0.4#egg=ckanext-noanonaccess && \
+#    pip install --no-cache-dir -e git+https://github.com/datopian/ckanext-dcat.git@v0.0.10#egg=ckanext-dcat && \
+#    pip install --no-cache-dir -r ${SRC_DIR}/ckanext-dcat/requirements.txt
+
+RUN pip install -e git+https://github.com/ckan/ckanext-geoview.git@v0.0.13#egg=ckanext-geoview && \
+    pip install -e git+https://github.com/ckan/ckanext-pdfview.git@0.0.5#egg=ckanext-pdfview
+
+# Apply patches
+COPY setup/patches ${APP_DIR}/patches
+
+RUN for d in $APP_DIR/patches/*; do \
+        for f in `ls $d/*.patch | sort -g`; do \
+		    cd $SRC_DIR/`basename "$d"` && echo "$0: Applying patch $f to $SRC_DIR/`basename $d`"; patch -p1 < "$f" ; \
+        done ; \
+    done
+
+# Dirty fix for https://github.com/ckan/ckan/issues/3610
+RUN sed -i "s/filename = re.sub(ur'-+', u'-', filename)//g" /srv/app/src/ckan/ckan/lib/munge.py
+
+#RUN echo "00 02 * * * paster --plugin=ckanext-cprvalidation validation scan -c /srv/app/production.ini >> /var/log/cron.log 2>&1" >> crontab.tmp && \
+#    echo "00 03 * * * paster --plugin=ckanext-updatetracking update -c /srv/app/production.ini >> /var/log/cron.log 2>&1" >> crontab.tmp && \
+#    crontab crontab.tmp && \
+#    rm -rf crontab.tmp
+
+# These plugins should always be added to cloud instances
+# (you can add more needed by your instance)
+#ENV CKAN__PLUGINS envvars stats image_view text_view recline_view pdf_view datastore datapusher sentry s3filestore harvest ckan_harvester recline_map_view resource_proxy geojson_view webpage_view portalopendatadk cprvalidation updatetracking noanonaccess dcat dcat_rdf_harvester dcat_json_harvester dcat_json_interface
+#ENV CKAN__PLUGINS envvars stats image_view text_view recline_view pdf_view datastore datapusher recline_map_view geojson_view webpage_view portalopendatadk
+
+# Load envvars plugin on ini file
+#RUN paster --plugin=ckan config-tool ${APP_DIR}/production.ini "ckan.plugins = ${CKAN__PLUGINS}"
+
+# Install packages needed by the dev requirements
+RUN apk add --no-cache libffi-dev
+
+# Install CKAN dev requirements
+RUN pip install --no-binary :all: -r https://raw.githubusercontent.com/ckan/ckan/${GIT_BRANCH}/dev-requirements.txt
+
+# Create folder for local extensions sources
+RUN mkdir $SRC_EXTENSIONS_DIR
+
+COPY setup/start_ckan_development.sh ${APP_DIR}
+
+
+CMD ["/srv/app/start_ckan_development.sh"]
+
