@@ -18,7 +18,7 @@ services:
       - "0.0.0.0:${CKAN_PORT}:5000"
     volumes:
       - ./src:/srv/app/src_extensions
-      - oddk_ckan_storage:/var/lib/ckan
+      - ckan_storage:/var/lib/ckan
     
 
   datapusher:
@@ -35,22 +35,22 @@ services:
     build:
       context: postgresql/
     volumes:
-      - oddk_pg_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
 
   solr:
     container_name: solr
     build:
       context: solr/
     volumes:
-      - oddk_solr_data:/opt/solr/server/solr/ckan/data/index
+      - solr_data:/opt/solr/server/solr/ckan/data/index
 
   redis:
     container_name: redis
     image: redis:alpine
     volumes:
-      - oddk_redis_data
+      - redis_data
 
 volumes:
-  oddk_ckan_storage:
-  oddk_pg_data:
-  oddk_solr_data:
+  ckan_storage:
+  pg_data:
+  solr_data:
